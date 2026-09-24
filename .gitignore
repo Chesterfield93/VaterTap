@@ -1,3 +1,12 @@
+# Secrets & Credentials (e.g., Wi-Fi passwords, API keys)
+.env
+config.json
+secrets.h
+
+# CAD & 3D printing temporary files (if you plan to design enclosures)
+*.log
+*.tmp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

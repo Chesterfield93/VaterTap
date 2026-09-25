@@ -2,28 +2,7 @@
 
 ## Zielbild
 
-```text
-[NFC]     [Waage]     [Taster]     [E-Paper]
-   |         |           |             |
-   +---------+-----+-----+-------------+
-                   |
-          [ESP32-S3 Edge Node]
-          - Messung und Filterung
-          - Zapf-Zustandsautomat
-          - Nutzersitzung und Attribution
-          - Lokales Event-Journal
-          - Token- und QR-Anzeige
-                   |
-             ausgehendes HTTPS
-                   |
-        [Reverse Proxy /vatertap/api/v1]
-                   |
-        [AppDaemon als Python-Backend]
-          - Roster-Verwaltung
-          - Aggregation und Historie
-          - Read-only Webansicht
-          - Dateibasierte Persistenz
-```
+![VaterTap Systemarchitektur](diagrams/system-overview.svg)
 
 ## Verantwortungsgrenzen
 

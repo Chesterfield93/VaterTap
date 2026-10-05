@@ -1,10 +1,9 @@
-# CI plan
+# CI-Plan
 
-Add workflows once the first executable project exists.
+Workflows anlegen, sobald erster ausfuehrbarer Code existiert.
 
-Planned checks:
-
-- Markdown lint and link check
-- Python lint, type check, tests
-- Firmware build, format, static analysis, host unit tests
-- Secret scanning
+- Markdown-Lint und Linkcheck
+- Python: ruff, Typpruefung, pytest
+- Firmware: Build Brain und Display, clang-format, statische Analyse, Host-Tests
+- Protokoll: gemeinsame Testvektoren (Zeilen mit CRC) fuer beide Knoten
+- Secret-Scan

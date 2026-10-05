@@ -1,78 +1,76 @@
-# Elektronik- und Verkabelungskonzept
+# Elektronik und Verkabelung
 
 ## Komponenten
 
-- TRMNL 7.5" OG DIY Kit mit XIAO ESP32-S3 Plus und EE04-Treiberboard
-- 7.5" E-Paper, 800 x 480
-- 4 x 50 kg Halbbrueckenzellen, zu einer Vollbruecke verschaltet, Vollskala 200 kg
-- HX711 Waegewandler
-- NFC-Leser PN532
-- Powerbank als Energiequelle
-- Optional spaeter: IMU, GNSS
+| Knoten | Komponenten |
+|---|---|
+| Brain | ESP32-S3-Board (Modell offen), 2x I2C, 1x UART |
+| Display | XIAO ESP32-S3 Plus auf EE04, 7,5" E-Paper 800x480, Taster |
+| Sensorbox | I2C-Multiplexer (TCA9548A oder PCA9546A), 3x NAU7802-Breakout |
+| Waage | 3x Edelstahl-Doppelbolzen-Waegezelle, 30 kg Nennlast |
+| NFC | PN532 an der Check-in-Position |
+| Versorgung | Powerbank mit Always-On |
 
-## Mechanik, der entscheidende Teil
-
-Der 3D-gedruckte Fasssockel traegt **ausschliesslich das Fass**. Damit bleiben
-Wagenstruktur, angelehnte Personen und abgelegte Jacken ausserhalb der Messkette. Diese
-Entscheidung ist messtechnisch wichtiger als jede Filterung in Software.
-
-Anforderungen an den Sockel:
-
-- Vier definierte Krafteinleitungspunkte, je eine Zelle pro Ecke
-- Zellen duerfen sich frei durchbiegen, kein Verspannen im Druckteil
-- Ueberlastanschlag, der ueber Vollskala mechanisch abfaengt
-- Rutschsicherung fuer das Fass, ohne die Zellen seitlich zu belasten
-- Zapfschlauch und Gasleitung **kraftfrei** gefuehrt, keine Zugkraft auf das Fass
-- Sockel steht auf ebener, steifer Flaeche, nicht direkt auf federnden Wagenlatten
-- Schichtrichtung und Wandstaerke so gewaehlt, dass Kriechen des Kunststoffs minimal
-  bleibt, idealerweise Metalleinleger an den Auflagepunkten
-
-Der Schlauchzug ist erfahrungsgemaess die haeufigste Fehlerquelle: Er wirkt wie eine
-variable Zusatzlast und ist von echter Entnahme nicht unterscheidbar.
-
-## Verschaltung der Waegezellen
-
-Die vier Halbbruecken werden zu einer Wheatstone-Vollbruecke kombiniert und auf Kanal A
-des HX711 gefuehrt. Kanal A bietet die hoehere Verstaerkung und damit die bessere
-Aufloesung.
+## Blockverdrahtung
 
 ```text
-Zelle 1..4 -> Vollbruecke -> kurze verdrillte Leitung -> HX711 (Kanal A)
-HX711 -> zwei Digitalsignale -> ESP32
+Powerbank 5 V
+  +--> Brain (USB-C oder 5V-Pin)
+  +--> Display/EE04 (USB-C)
+
+Brain I2C 0 ===== 4-adrig (3V3, GND, SDA, SCL) =====> Sensorbox
+                                                        Mux Kanal 0 -> NAU7802 #1 -> Zelle 1
+                                                        Mux Kanal 1 -> NAU7802 #2 -> Zelle 2
+                                                        Mux Kanal 2 -> NAU7802 #3 -> Zelle 3
+Brain I2C 1 ===== 4-adrig =====> PN532   (spaeter zusaetzlich IMU)
+Brain UART  ===== 3-adrig (TX, RX, GND) =====> Display (gekreuzt)
 ```
 
-Praxisregeln:
+## Adresskonflikt NAU7802
 
-- HX711 so nah wie moeglich an den Zellen, Digitalleitung lieber lang als Analogleitung
-- Zellenkabel nicht verlaengern, wenn vermeidbar
-- Abstand zu DC/DC-Wandler, WLAN-Antenne und Powerbank
-- Schirm einseitig auf Masse, keine Masseschleife
-- Sternfoermige Masse nahe der Versorgung
+Der NAU7802 hat die feste I2C-Adresse 0x2A. Drei Chips an einem Bus sind nur ueber
+einen Multiplexer moeglich. Der Multiplexer schaltet je Lesezyklus einen Kanal frei.
+
+Pruefen bei Beschaffung:
+
+- Breakouts haben eigene Pull-ups. Pro Mux-Kanal ist das unkritisch, am Haupt-Bus
+  genau ein Pull-up-Paar sicherstellen.
+- Versorgungsspannung aller Breakouts = Logikpegel des Brain (3,3 V).
+- DRDY-Pins: fuer v1 nicht verdrahtet, Polling ueber Statusregister genuegt.
+
+## Sensorbox
+
+- Unter dem Sockel, kurze Zellenkabel, Zellenkabel nicht verlaengern
+- Zugentlastung fuer alle drei Zellenkabel und das Buskabel
+- Spritzwassergeschuetzt, Kabelverschraubungen, belueftet gegen Kondensat
+- Buskabel zum Brain verdrillt (SDA mit GND, SCL mit GND), so kurz wie moeglich
+- Bei Buslaengen ueber ca. 1 m: Bustakt reduzieren oder I2C-Bus-Extender vorsehen
+
+## UART Brain <-> Display
+
+- TX/RX gekreuzt, gemeinsame Masse zwingend
+- Beide 3,3-V-Pegel, kein Pegelwandler
+- Steckverbinder verriegelnd
 
 ## Stromversorgung
 
-Powerbank als Quelle. Der bekannte Fallstrick: viele Powerbanks schalten bei geringer
-Last nach etwa 30 Sekunden ab.
+Powerbanks schalten bei geringer Last oft nach ca. 30 s ab. Modell mit Always-On oder
+definierte Grundlast vorsehen. Gemeinsame Masse beider Knoten ueber die Versorgung
+sicherstellen, sonst ist der UART-Bezug undefiniert.
 
-Vorgaben:
-
-- Modell mit Always-On- oder Passthrough-Funktion verwenden, oder
-- definierte Grundlast vorsehen, falls kein solches Modell verfuegbar ist
-- Kabel mit ausreichendem Querschnitt, USB-Spannungseinbruch beim WLAN-Peak messen
-- Brownout-Erkennung aktiv, Journalschreibvorgaenge gegen Einbruch absichern
-- Laufzeitbudget mit realem WLAN-, NFC- und Displaybetrieb messen, nicht schaetzen
+- Reale Stromaufnahme beider Knoten messen
+- Spannungseinbruch bei WLAN- und Refresh-Spitzen pruefen
+- Brownout-Erkennung aktiv, Journal gegen Abbruch gesichert
 
 ## Kalibrierung
 
-- Nullpunkt mit leerem Sockel, danach Tara persistent speichern
-- Referenzgewicht moeglichst nahe der Betriebslast, nicht 1 kg bei 60 kg Nutzlast
-- Ecklastpruefung an allen vier Positionen
-- Kriech- und Driftprotokoll ueber mindestens die geplante Veranstaltungsdauer
-- Kalibrierdaten versioniert und im Diagnosemenue sichtbar
+- Nullpunkt mit leerem Sockel je Zelle
+- Referenzgewicht nahe der Betriebslast, an drei Positionen
+- Kalibrierfaktor je Zelle, nicht nur fuer die Summe
+- Kriech- und Driftprotokoll ueber geplante Einsatzdauer
+- Kalibrierdaten versioniert, im Diagnosemenue sichtbar
 
 ## Vertagt
 
-Die GPIO-Belegung wird erst bei Beginn der Board-Programmierung festgelegt. Die frueher
-notierte Zuordnung ist nicht freigabefaehig, da GPIO5 doppelt belegt war und die
-Batteriemesspfade nicht automatisch durch Weglassen der Batterie elektrisch frei
-werden. Vor dem Loeten ist ein Pin-Audit am realen Board Pflicht.
+GPIO-Belegung beider Knoten (ADR-0009). Durch den Split ist der Druck stark gesunken:
+Das Display braucht nur SPI, Taster und UART; das Brain zwei I2C-Busse und einen UART.

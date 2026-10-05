@@ -2,58 +2,103 @@
 
 ## Zielbild
 
-![VaterTap Systemarchitektur](diagrams/system-overview.svg)
+```text
+ON-VEHICLE
+                                      +---------------------------+
+ [Waegezelle x3] -analog-> [Sensorbox] -I2C Bus 0-> |                           |
+                    (TCA/PCA-Mux + 3x NAU7802)       |  BRAIN  (ESP32-S3)        |
+ [NFC PN532] ---------------I2C Bus 1-------------> |  Fachlogik, Zustand,      | -- HTTPS -->  BACKEND
+ [IMU, spaeter] ------------I2C Bus 1-------------> |  Journal, Backend-Sync    |
+                                                    +---------------------------+
+                                                         ^            |
+                                    Tasten-Events (ACK)  |  UART      | Viewmodel 1 Hz
+                                                         |            v
+                                                    +---------------------------+
+ [Taster] ----GPIO----------------------------------> |  DISPLAY (XIAO auf EE04)  |
+ [E-Paper 7,5"] <---SPI/FPC------------------------- |  Renderer, QR, Watchdog   | -- WLAN nur OTA, zuhause
+                                                    +---------------------------+
 
-## Verantwortungsgrenzen
+BACKEND
+ [Reverse Proxy /vatertap/api/v1] -> [AppDaemon als Python-Laufzeit] -> [lokale Dateien]
+                                               ^
+                        [Smartphone] -- HTTPS, Tagestoken aus QR
+```
 
-### ESP32-S3
+Ein grafisches Diagramm folgt unter `diagrams/`.
 
-Der ESP ist die fachliche Wahrheit zum Zeitpunkt der Messung.
+## Knoten und Verantwortung
 
-- Waage einlesen, filtern, Stabilitaet bewerten
-- Zapfbeginn und Zapfstopp als Zustandsautomat erkennen
-- Nutzersitzung fuehren und Menge lokal attribuieren
-- Devil's Share bei fehlender Sitzung buchen
-- Ereignisse mit Sequenznummer persistent puffern
-- E-Paper inklusive Fehlercodes und QR bedienen
-- Roster und Konfiguration lokal cachen
+### Brain
 
-### AppDaemon
+Einziger Besitzer von Messung, Fachzustand und Backend-Kommunikation.
 
-- Ereignisse idempotent annehmen und dateibasiert ablegen
-- Aggregation je Nutzer, Tag und Fass
-- Read-only Webansicht mit Tagestoken
-- Roster und Konfiguration ausliefern
-- Gerätestatus ueberwachen
+- Drei Zellen einzeln einlesen, summieren, plausibilisieren
+- Zapfvorgang per Zustandsautomat erkennen
+- Nutzersitzung fuehren und lokal attribuieren
+- Events ins Journal schreiben (Outbox), per HTTPS nachliefern
+- Viewmodel fuer das Display erzeugen, Tastenereignisse interpretieren
+- Display ueberwachen, Warnungen und Fehler ans Backend melden
+- Roster, Konfiguration und Tagestoken cachen
 
-### Home Assistant
+Aufbau intern: siehe [Task-Modell](brain-task-model.md).
 
-Fuer v1 **nicht** Bestandteil des Datenpfads. AppDaemon dient ausschliesslich als
-Python-Laufzeitumgebung. Eine spaetere MQTT-Bruecke bleibt backendseitig moeglich.
+### Display
 
-## Warum Attribution auf dem Geraet liegt
+Reine Darstellung und Eingabe, keine Fachlogik.
 
-Eine Zuordnung im Backend waere netzabhaengig. Am Vatertag ist genau das der
-unzuverlaessigste Teil des Systems. Der ESP kennt Sitzung, Zeitpunkt und Messung
-ohnehin vollstaendig; das Backend wuerde dieselbe Entscheidung nur spaeter und mit
-schlechteren Informationen erneut treffen. Das Backend darf Attribution daher
-**nicht** korrigieren, sondern nur aggregieren.
+- Viewmodel empfangen und rendern, inklusive QR-Erzeugung
+- Teil- oder Vollrefresh selbst waehlen, Vollrefresh nach QR erzwingen
+- Rohe Tastenereignisse an das Brain melden
+- Brain-Ausfall erkennen und anzeigen
+- WLAN ausschliesslich fuer OTA im Heimnetz
 
-Konsequenz: Der Roster (Tag-UID zu Nutzer-ID) muss lokal vorliegen. Er wird beim Start
-und periodisch geladen und persistent gecacht. Ein unbekannter Tag erzeugt keine
-Sitzung, sondern eine neutrale Anzeige.
+Faellt das Display aus, laufen Messung und Buchung unveraendert weiter.
 
-## Datenfluss einer Zapfung
+### Sensorbox
 
-1. Tag aufgelegt, Sitzung startet, Tagestoken wird geholt oder aus Cache genutzt.
-2. Gewichtsabnahme ueberschreitet Startschwelle, Zustand wechselt auf `POURING`.
-3. Gewicht bleibt fuer die Stopp-Zeit stabil, Zustand wechselt auf `SETTLING`.
-4. Nach Settle-Fenster wird die Menge final berechnet und als Ereignis geschrieben.
-5. QR-Code mit persoenlichem Statistik-Link wird angezeigt, danach Vollrefresh.
-6. Ereignis wird bei naechster Gelegenheit an das Backend gesendet und bestaetigt.
+Eine gemeinsame Box unter dem Fasssockel mit Multiplexer und drei NAU7802. Analoge
+Leitungen bleiben kurz; zum Brain fuehrt nur ein digitales I2C-Kabel. Der NFC-Leser
+sitzt nicht in der Box, sondern an der Check-in-Position.
 
-## Bewusst vertagte Themen
+### Backend
 
-- GPIO-Belegung und Board-Rework
-- Firmware-Toolchain
-- Ein- oder Zwei-Knoten-Aufbau
+AppDaemon dient nur als Python-Laufzeit. Keine Home-Assistant-Entities im Datenpfad.
+
+- Events idempotent annehmen und dateibasiert ablegen
+- Aggregation je Nutzer, Tag und Fass; keine Aenderung der Attribution
+- Read-only Webansicht per Tagestoken
+- Roster und Konfiguration ausliefern, Health und Logs annehmen
+
+## Schnittstellen
+
+| Von | Nach | Medium | Inhalt |
+|---|---|---|---|
+| Waegezellen | NAU7802 | analog, je Zelle eigene Bruecke | Brueckenspannung |
+| Sensorbox | Brain | I2C Bus 0 ueber Multiplexer | Rohwerte je Zelle |
+| PN532 | Brain | I2C Bus 1 | Tag-UID |
+| Brain | Display | UART, NDJSON + CRC | Viewmodel, zyklisch |
+| Display | Brain | UART, NDJSON + CRC | Tasten-Events, Heartbeat |
+| Brain | Backend | HTTPS ausgehend | Events, Health, Logs, Roster, Config, Sessions |
+| Smartphone | Backend | HTTPS | Statistik per Tagestoken |
+| Brain, Display | OTA-Quelle | WLAN | Firmware-Images |
+
+## Netze
+
+| Knoten | WLAN-Liste | Zweck |
+|---|---|---|
+| Brain | Heimnetze + mobile Hotspots | Backend-Sync, OTA |
+| Display | nur Heimnetze | ausschliesslich OTA |
+
+## Architekturprinzipien
+
+- Offline-first, idempotent, fail-safe
+- Brain intern hexagonal: Domain im Zentrum, Sensorik, Display, Journal, Backend als Ports
+- Zustand nur ueber Nachrichten teilen, keine geteilten Variablen
+- Treiber hinter eigenen Interfaces
+- Rohmessung, Ableitung und Praesentation strikt getrennt
+
+## Offen
+
+- GPIO-Belegung je Knoten (ADR-0009)
+- Firmware-Toolchain (ADR-0001)
+- OTA-Signierung und Bundle-Update (ADR-0013)

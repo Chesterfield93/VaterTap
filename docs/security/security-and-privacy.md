@@ -1,43 +1,45 @@
 # Security und Datenschutz
 
-## Zugriffsmodell
+## Zugriffsmodell Statistik
 
-Der Zugriff auf persoenliche Statistiken erfolgt ueber ein Token, das beim NFC-Check-in
-erzeugt wird und am Tagesende ablaeuft. Der Token wird als QR-Code auf dem E-Paper
-angezeigt und liegt damit in der URL.
-
-Bewertung: fuer diesen Anwendungsfall vertretbar.
-
-- read-only, keine schreibenden Operationen
-- Gueltigkeit auf einen Tag begrenzt
-- Erzeugung erfordert physischen Besitz des personalisierten Tags
-- Offenlegung betrifft ausschliesslich die eigene Trinkstatistik
+Token wird beim Check-in erzeugt, ist read-only und laeuft am Tagesende ab. Er steht in
+der URL, da ein QR-Code die Information vollstaendig tragen muss.
 
 Auflagen:
 
-- Nach jeder QR-Anzeige ein Vollrefresh des Displays, da Ghosting den Code weiterhin
-  scanbar halten kann.
-- Serverseitig nur ein Token-Praefix protokollieren, nie den vollstaendigen Token.
-- `Referrer-Policy: no-referrer` und `Cache-Control: no-store` auf der Statistikseite.
-- Rate Limiting je Token und je IP.
-- Tokens am Folgetag serverseitig loeschen, nicht nur als abgelaufen markieren.
-- Token traegt keinerlei Adminrechte; Konfiguration laeuft ueber einen getrennten Pfad.
+- Vollrefresh nach jeder QR-Anzeige (Ghosting haelt den Code sonst scanbar)
+- Serverseitig nur Token-Praefix loggen
+- `Referrer-Policy: no-referrer`, `Cache-Control: no-store`
+- Rate Limiting je Token und IP
+- Abgelaufene Tokens am Folgetag loeschen
+- Token ohne Schreib- und Adminrechte
 
-## Weitere Vorgaben
+## Geraete und Transport
 
-- Ausschliesslich ausgehende TLS-Verbindungen vom Geraet.
-- Geraeteauthentifizierung getrennt von Nutzer-Tokens.
-- Secrets in NVS beziehungsweise Backend-Konfiguration, niemals im Repository.
-- Kein unauthentifizierter OTA-, Debug- oder Konfigurationsendpunkt.
-- OTA nur im bewussten Wartungsmodus, moeglichst signiert, mit Rollback.
-- NFC-UID ist kein Sicherheitsmerkmal. Sie ist kopierbar und dient nur der Zuordnung.
-- Logs ohne vollstaendige UIDs und ohne vollstaendige Tokens.
+- Nur ausgehendes HTTPS vom Brain
+- Geraeteauthentifizierung getrennt vom Nutzer-Token
+- Display hat keinen Backend-Zugang und keine Credentials ausser Heim-WLAN
+- Secrets in NVS bzw. Backend-Konfiguration, nie im Repository
+- Logs ohne vollstaendige UIDs und Tokens
+
+## OTA
+
+- Beide Knoten per OTA, Zwei-Partitionen-Schema mit Rollback
+- Display nur ueber Heimnetz
+- Signaturpruefung auf dem Geraet ist das Sicherheitsmerkmal, nicht die Quelle
+  (Backend oder GitHub Releases sind beide zulaessig, sobald signiert wird)
+- Bis zur Signierung: OTA nur im bewusst aktivierten Wartungsmodus
+- Details und Bundle-Logik: ADR-0013
+
+## UART
+
+Der UART ist physisch intern und unverschluesselt. Annahme: Wer am Wagen Kabel
+umstecken kann, hat ohnehin physischen Zugriff. Die CRC dient der Integritaet gegen
+Stoerungen, nicht gegen Manipulation.
 
 ## Datenschutz
 
-Die kurze Token-Lebensdauer begrenzt den Zugriff, nicht die Speicherung. Zusaetzlich:
-
-- Ereignisse speichern Pseudonyme, nicht Klarnamen.
-- Aufbewahrungsfrist fuer Rohereignisse konfigurierbar.
-- Teilnahme bleibt freiwillig; ohne Check-in laeuft alles auf Devil's Share, und das
-  System funktioniert weiterhin vollstaendig.
+- Pseudonyme statt Klarnamen in Events
+- Aufbewahrungsfrist konfigurierbar
+- Teilnahme freiwillig: ohne Check-in laeuft alles auf Devil's Share
+- NFC-UID ist kopierbar und kein Sicherheitsmerkmal

@@ -1,48 +1,46 @@
 # Bedienung und Anzeige
 
-## Randbedingung E-Paper
+## Rollenverteilung
 
-Vollrefresh dauert mehrere Sekunden und flackert. Teilrefresh ist schnell, hinterlaesst
-aber Ghosting. Das Bedienkonzept muss beides beruecksichtigen.
+Das Brain entscheidet **was** angezeigt wird (Viewmodel, Menuezustand). Das Display
+entscheidet **wie** (Layout, QR-Pixel, Refresh-Art).
 
-## Bildschirmbereiche
+## E-Paper-Randbedingung
+
+Vollrefresh dauert Sekunden und flackert, Teilrefresh hinterlaesst Ghosting.
 
 | Bereich | Inhalt | Refresh |
 |---|---|---|
-| Kopf | Restmenge, Fassstatus | Teilrefresh bei Aenderung |
-| Mitte | Aktueller Nutzer, letzte Zapfmenge | Teilrefresh |
-| QR-Feld | Persoenlicher Statistik-Link | Teilrefresh, danach Vollrefresh |
-| Fuss | Systemstatus, Netz, Fehlercode | Teilrefresh |
+| Kopf | Restmenge, Fuellstand | Teil |
+| Mitte | Nutzer, letzte Zapfmenge | Teil |
+| QR-Feld | Statistik-Link | Teil, danach verpflichtend Voll |
+| Fuss | Netz, Backend, Fehlercode | Teil |
 
-## Fehleranzeige
+## Fehlercodes
 
-Fehler erscheinen als kurzer Code plus Klartext, damit im Feld ohne Laptop
-diagnostiziert werden kann.
+| Code | Bedeutung | Erkannt durch |
+|---|---|---|
+| `E01` | Waage liefert keine Daten | Brain |
+| `E02` | Kalibrierung fehlt | Brain |
+| `E03` | NFC nicht erreichbar | Brain |
+| `E04` | Journal voll | Brain |
+| `E05` | Backend nicht erreichbar, Puffer aktiv | Brain |
+| `E06` | Zeit nicht synchronisiert | Brain |
+| `E07` | Messwert instabil, Buchung ausgesetzt | Brain |
+| `E08` | Zellenungleichgewicht oder Zellendefekt | Brain |
+| `E09` | Brain nicht erreichbar | Display, lokal |
+| `E10` | Protokollversion inkompatibel | Display, lokal |
 
-| Code | Bedeutung |
-|---|---|
-| `E01` | Waage liefert keine Daten |
-| `E02` | Kalibrierung fehlt oder ungueltig |
-| `E03` | NFC-Leser nicht erreichbar |
-| `E04` | Journal voll |
-| `E05` | Backend nicht erreichbar, Puffer aktiv |
-| `E06` | Zeit nicht synchronisiert |
-| `E07` | Messwert instabil, Buchung ausgesetzt |
+`E09` und `E10` erzeugt das Display selbst, da in diesen Faellen kein Viewmodel kommt.
 
-## Tastenbelegung, Vorschlag
+## Tasten
 
-Flache Struktur, maximal eine Ebene, da jeder Menuewechsel einen Refresh kostet.
+Flach, maximal eine Menueebene.
 
 | Taste | Kurz | Lang |
 |---|---|---|
-| 1 | Ansicht wechseln, Statistik und Diagnose | Tara |
+| 1 | Ansicht wechseln (Status, Statistik, Diagnose) | Tara |
 | 2 | Devil's-Share-Korrektur auf letzten Nutzer | Fasswechsel bestaetigen |
-| 3 | optional, entfaellt falls GPIO benoetigt | - |
+| 3 | optional | - |
 
-Die endgueltige Belegung haengt von der spaeteren GPIO-Entscheidung ab. Tara und
-Fasswechsel liegen bewusst auf Langdruck, da beide die Messbasis veraendern.
-
-## QR und Ghosting
-
-Nach jeder QR-Anzeige ist ein Vollrefresh verpflichtend. Ein geisterhaft sichtbarer
-QR-Code bleibt oft scanbar und wuerde das Token laenger exponieren als vorgesehen.
+Tara und Fasswechsel liegen auf Langdruck, da beide die Messbasis aendern.

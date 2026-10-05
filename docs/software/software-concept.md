@@ -1,97 +1,104 @@
 # Softwarekonzept
 
-## Firmware, Herangehensweise
-
-Kein Code in dieser Phase. Festgelegt ist nur die Struktur.
+## Repositorystruktur, Zielbild
 
 ```text
 firmware/
-  src/
-    app/             # Zustandsautomat, Sitzung, Use Cases
-    domain/          # Ereignisse, Einheiten, Attribution, Validierung
-    drivers/         # Waage, NFC, E-Paper, Taster
-    infrastructure/  # HTTPS-Client, Journal, Zeit, Konfiguration, OTA
-    ui/              # Viewmodel, Rendering, Fehlercodes, QR
-  test/              # hostnahe Unit-Tests ohne Hardware
-```
-
-Kernidee: `domain` und `app` sind hardwarefrei und damit auf dem Entwicklungsrechner
-testbar. Zapferkennung, Attribution und Devil's-Share-Logik lassen sich so gegen
-aufgezeichnete Gewichtsverlaeufe pruefen, ohne Bier zu verbrauchen.
-
-## Zur Frage, was PlatformIO ist
-
-PlatformIO ist **kein** Firmware-Framework, sondern ein Build- und
-Abhaengigkeitswerkzeug mit VS-Code-Integration. Es laedt Toolchain und Bibliotheken,
-erzeugt reproduzierbare Builds und kennt Unit-Test-Targets.
-
-Das Framework liegt eine Ebene darunter und ist die eigentliche Wahl:
-
-| Ebene | Optionen |
-|---|---|
-| Werkzeug | PlatformIO, Arduino IDE, natives ESP-IDF-Build |
-| Framework | Arduino-Core, ESP-IDF |
-| Fertigloesung | ESPHome, ersetzt eigene Firmware weitgehend |
-
-"Raw C++" ist keine Alternative dazu. C++ ist die Sprache; SDK, HAL und Buildsystem
-werden trotzdem benoetigt.
-
-Diskussion und Entscheidung erfolgen bei Beginn der Board-Programmierung.
-
-## Backend, Herangehensweise
-
-AppDaemon dient als Python-Laufzeitumgebung. Keine Home-Assistant-Entities im
-Datenpfad.
-
-```text
-appdaemon/apps/vatertap/
-  domain/          # Nutzer, Buchungen, Aggregation
-  application/     # Use Cases
-  adapters/
-    http/          # Event-Aufnahme, Roster, Sessions
-    storage/       # dateibasierte Persistenz
-  web/             # read-only Statistikansicht
+  brain/
+    src/
+      domain/          # Zustandsautomat, Attribution, Devil's Share, Mengen, Events
+      app/             # Use Cases, Viewmodel-Erzeugung, Menuelogik
+      ports/           # Interfaces: Sensor, Display, Journal, Backend
+      adapters/
+        sensors/       # NAU7802 ueber Mux, PN532
+        display_link/  # UART-Protokoll
+        journal/       # Outbox, Log-Ringpuffer
+        backend/       # HTTPS-Client
+      tasks/           # FreeRTOS-Tasks und Verdrahtung
+    test/              # hostnahe Tests fuer domain und app
+  display/
+    src/
+      render/          # Layout, QR, Refresh-Strategie
+      link/            # UART-Protokoll, Watchdog
+      input/           # Taster
+    test/
+  shared/
+    protocol/          # Nachrichtenschema, CRC, Versionen - von beiden Knoten genutzt
+appdaemon/
+  apps/vatertap/
+    domain/
+    application/
+    adapters/http/
+    adapters/storage/
+    web/
   tests/
+docs/
+hardware/
 ```
 
-## Persistenz, dateibasiert
+`shared/protocol` verhindert, dass Brain und Display das Protokoll unterschiedlich
+implementieren.
 
-Analog zum bekannten plex_porter-Ansatz:
+## Firmware-Toolchain
 
-| Datei | Inhalt | Eigenschaft |
+Vertagt (ADR-0001). Begriffsklaerung: PlatformIO ist ein Build- und
+Abhaengigkeitswerkzeug, kein Framework. Das Framework darunter ist Arduino-Core oder
+ESP-IDF. Die Struktur oben funktioniert mit beiden.
+
+## Persistenz Brain
+
+| Bereich | Groesse | Verhalten bei voll |
 |---|---|---|
-| `events.jsonl` | Rohereignisse | append-only, Quelle der Wahrheit |
-| `roster.json` | Tag-UID zu Nutzer-ID | nur lesend im Betrieb |
-| `sessions.json` | aktive Tagestoken | taegliche Bereinigung |
-| `state.json` | abgeleitete Aggregate | jederzeit neu berechenbar |
+| Event-Journal | eigene Partition, ca. 1 MB | `STORAGE_FULL`, E04, nie ueberschreiben |
+| Log-Ringpuffer | ca. 64 KB im Flash | aelteste Eintraege werden ueberschrieben |
+| Konfiguration, Roster, Kalibrierung | NVS | - |
 
-Regeln:
+Abschaetzung Journal: ca. 250 B je Event, ca. 300 Events pro Tag, also ca. 75 KB pro Tag.
+1 MB reicht fuer mehr als 10 Tage offline. Bestaetigte Events werden segmentweise
+geloescht.
 
-- Schreibvorgaenge atomar ueber temporaere Datei und Rename
-- Rotation und Aufbewahrungsfrist konfigurierbar
-- Aggregate sind Cache, nie Wahrheit. Bei Zweifel aus `events.jsonl` neu aufbauen.
-- Defekte Zeilen werden uebersprungen und gezaehlt, nicht stillschweigend ignoriert
+Logs und Events liegen bewusst getrennt: Ein Fehlersturm darf nie Platz fuer
+Zapfdaten belegen.
 
-Dateibasiert ist bei dieser Datenmenge voellig ausreichend. Die einzige reale Gefahr
-ist ein abgebrochener Schreibvorgang, und genau die adressiert das append-only-Format.
+## Logging
 
-## Entwicklungsstandards
+- Remote: ab Warnung, Info-Level per Konfiguration zuschaltbar
+- Deduplizierung: gleiche Meldung wird zu Code, Anzahl, erstem und letztem Zeitpunkt
+- Info-Level nur im RAM gepuffert, nie im Flash
+- Keine Unterscheidung zwischen Heim- und Mobilnetz
+- Display-Logs laufen ueber den Heartbeat ins Brain und von dort ans Backend
+
+## Persistenz Backend
+
+| Datei | Inhalt |
+|---|---|
+| `events.jsonl` | append-only, Quelle der Wahrheit |
+| `logs.jsonl` | Geraetelogs, rotiert |
+| `roster.json` | Tag-UID zu Nutzer-ID |
+| `sessions.json` | aktive Tagestoken |
+| `state.json` | Aggregate, jederzeit rekonstruierbar |
+
+Atomare Writes ueber temporaere Datei und Rename. Defekte Zeilen werden gezaehlt und
+gemeldet.
+
+## Standards
 
 ### C++
 
-- Physikalische Einheiten im Namen, etwa `mass_g`, `volume_ml`, `timeout_s`
+- Einheiten im Namen: `mass_g`, `volume_ml`, `timeout_s`
 - Keine dynamische Allokation im Messpfad
-- Hardwarebibliotheken hinter eigenen Interfaces
-- Fehler als expliziter Status, keine stillen Ersatzwerte
+- Fehler als expliziter Status, keine Ersatzwerte
+- Hardware nur ueber `ports/`
+- Formatierung per `clang-format`, statische Analyse in CI
 
 ### Python
 
 - Typannotationen, `ruff`, `pytest`
-- Fachlogik nicht in HTTP-Handlern
-- Eingehende Payloads und Schemaversionen validieren
+- Keine Fachlogik in HTTP-Handlern
+- Payload- und Schemavalidierung bei jedem Eingang
 
 ### Gemeinsam
 
-- Kleine Pull Requests mit ADR-Bezug bei Architekturaenderungen
-- Tests fuer Zustandsuebergaenge, Attribution, Idempotenz und Neustart
-- Konfigurationswerte nie im Code hart kodieren
+- Kleine PRs, ADR-Bezug bei Architekturaenderung
+- Tests fuer Zustandsuebergaenge, Attribution, Idempotenz, Neustart, Protokoll-CRC
+- Konfiguration nie hart kodiert

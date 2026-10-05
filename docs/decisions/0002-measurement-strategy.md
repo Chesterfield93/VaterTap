@@ -1,36 +1,30 @@
-# ADR-0002: Messstrategie
+# ADR-0002: Messstrategie und Waegezellen
 
-- Status: accepted
+- Status: accepted (Revision 2, ersetzt 4x50-kg-Variante)
 
 ## Entscheidung
 
-Gravimetrische Messung ueber vier 50-kg-Halbbrueckenzellen in Vollbruecke, HX711,
-Vollskala 200 kg. Die Waage traegt ausschliesslich das Fass auf einem 3D-gedruckten
-Sockel.
+- Gravimetrisch, 3-Punkt-Lagerung
+- 3x Edelstahl-Doppelbolzen-Waegezelle, 30 kg Nennlast, Gesamtnennlast 90 kg
+- Sockel mit Fasszentrierung und Fuehrungsbolzen mit Gleitlagern
+- Waage traegt nur das Fass
+- Durchflussmessung verworfen (Gasanteil, Schaum, Reinigung)
 
-Durchflussmessung ist **verworfen**. Fuer karbonisiertes Bier sind gaengige
-Durchflussmesser durch Gasanteil und Schaum unzuverlaessig, zusaetzlich entsteht
-Reinigungsaufwand im Produktpfad.
+## Begruendung
 
-## Begruendung fuer den Fasssockel
-
-Wuerde ein Teil der Wagenstruktur mitgemessen, gingen angelehnte Personen und abgelegte
-Gegenstaende in die Messung ein. Ein separater Sockel entkoppelt die Messkette
-mechanisch und ist wirksamer als jede Softwarefilterung. Seitliches Verrutschen des
-Fasses ist unkritisch, solange die Gesamtmasse auf den vier Punkten verbleibt.
+- 3 Punkte sind statisch bestimmt; jede Zelle traegt immer, kein Kippeln
+- Maximal 30-l-Fass, Gesamtlast ca. 42-46 kg; 30 kg je Zelle ergibt ca. 50 %
+  statische Auslastung mit Reserve
+- 200-ml-Portion entspricht ca. 0,22 % der Nennlast statt 0,1 % bei 200 kg
+- Einzelzellen ermoeglichen Diagnose und Ecklastkorrektur
 
 ## Konsequenzen
 
-- 0,2-l-Portion entspricht etwa 0,1 Prozent der Vollskala. Absolutgenauigkeit reicht
-  dafuer nicht aus; die Portion wird deshalb rein differenziell aus zwei stabilen
-  Plateaus bestimmt.
-- Portions- und Restmengengenauigkeit werden getrennt spezifiziert, siehe NFR-001 und
-  NFR-002.
-- Kriechen der Zellen erzwingt ein Settle-Fenster vor der Buchung.
-- Schlauchfuehrung muss kraftfrei sein.
+- Fuehrungsbolzen nur mit radialem Spiel, sonst Kraftnebenschluss
+  (siehe `docs/hardware/scale-mechanics.md`)
+- Ueberlastanschlaege konstruktiv vorbereiten, Einbau nach Datenblattlage
+- Portion weiterhin rein differenziell ueber stabile Plateaus
 
 ## Verifikation
 
-Messreihe mit mindestens 20 Referenzentnahmen von 0,2 l, Kriechprotokoll und
-Ecklasttest. Wird NFR-001 verfehlt, ist die Alternative ein Single-Point-Waegebalken mit
-geringerer Vollskala.
+Hysteresetest, Ecklasttest, 20 Referenzentnahmen 200 ml, Nullpunkt nach Transport.

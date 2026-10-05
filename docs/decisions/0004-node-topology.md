@@ -1,39 +1,29 @@
-# ADR-0004: Knoten-Topologie
+# ADR-0004: Knoten-Topologie Brain/Display
 
-- Status: deferred
+- Status: accepted
 
-## Kontext
+## Entscheidung
 
-Ein separater Sensorknoten wuerde die Umsetzung vereinfachen, da Waage und NFC nicht mit
-dem Display um GPIOs und Bus-Timing konkurrieren.
-
-## Architekturregel, falls aufgeteilt wird
-
-Der Knoten mit den Sensoren besitzt die Fachlogik und fuehrt die Backend-Kommunikation.
+Zwei ESP32-S3-Knoten:
 
 | Knoten | Rolle |
 |---|---|
-| Sensorknoten | Waage, NFC, Sitzung, Zustandsautomat, Journal, HTTPS zum Backend |
-| Displayknoten | reiner Renderer, zeigt ein fertiges Viewmodell an |
+| **Brain** | Sensorik, Domain, Zustand, Journal, Backend-Sync, Display-Ueberwachung |
+| **Display** (XIAO auf EE04) | Renderer und Tasteneingabe |
 
-Kopplung ueber UART mit einem schlanken, versionierten Nachrichtenformat und
-Bestaetigung. Kein zweites WLAN, kein ESP-NOW.
+Kopplung per UART (ADR-0010).
 
-## Begruendung dieser Aufteilung
+## Begruendung
 
-Laege das Journal beim Displayknoten, muesste jedes Ereignis eine zusaetzliche
-Verbindung passieren, bevor es dauerhaft gespeichert ist. Damit entstuenden zwei
-Fehlerquellen fuer dieselbe Wahrheit. Der Renderer darf ausfallen, ohne dass Messung
-oder Buchung beeintraechtigt sind. Fehlt das Display, zeigt der Sensorknoten den Zustand
-ueber Statusausgaben an.
+- Trennt Fachlogik von UI, ein vollwertiger ESP32 fuer Logik und Connectivity
+- Loest GPIO-Knappheit des EE04
+- Displayausfall beeintraechtigt Messung und Buchung nicht
+- Journal und Backend-Sync liegen beim Messknoten, keine zweite Fehlerquelle fuer
+  dieselbe Wahrheit
 
-## Offener Punkt
+## Konsequenzen
 
-Der urspruengliche Treiber fuer die Aufteilung war GPIO-Knappheit durch den HX711. Ob
-sie tatsaechlich noetig ist, entscheidet sich mit ADR-0009.
-
-## Konsequenz fuer die Struktur
-
-Die Firmware wird so geschnitten, dass `domain` und `app` unabhaengig von der
-Knotenanzahl bleiben. Eine spaetere Aufteilung verschiebt dann nur Adapter, keine
-Fachlogik.
+- Zwei Firmwares, gemeinsames Protokollmodul
+- Versionskompatibilitaet muss geprueft werden
+- Taster liegen am Display, ihre Bedeutung im Brain
+- Gemeinsame Masse beider Knoten zwingend

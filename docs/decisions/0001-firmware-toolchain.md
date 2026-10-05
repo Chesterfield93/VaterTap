@@ -4,28 +4,22 @@
 
 ## Kontext
 
-Die Wahl wurde bewusst vertagt, bis die Board-Programmierung beginnt. Zuvor ist die
-Begriffsklaerung wichtiger als die Entscheidung.
+Entscheidung bei Beginn der Board-Programmierung. Gilt jetzt fuer zwei Firmwares
+(Brain, Display) plus gemeinsames Protokollmodul.
 
 ## Begriffsklaerung
 
-PlatformIO ist ein Build- und Abhaengigkeitswerkzeug, kein Framework. Das Framework ist
-Arduino-Core oder ESP-IDF. ESPHome ist eine Fertigloesung, die eigene Firmware weitgehend
-ersetzt.
+PlatformIO ist Build- und Abhaengigkeitswerkzeug. Framework ist Arduino-Core oder
+ESP-IDF. ESPHome ersetzt eigene Firmware weitgehend und scheidet fuer das Brain aus.
 
 ## Optionen
 
-1. PlatformIO mit Arduino-Core
-2. PlatformIO mit ESP-IDF
-3. Natives ESP-IDF-Build
-4. ESPHome
+1. PlatformIO + Arduino-Core
+2. PlatformIO + ESP-IDF
+3. Natives ESP-IDF
 
-## Vorlaeufige Einschaetzung
+## Kriterien
 
-ESPHome duerfte an Event-Journal, Sitzungslogik, QR-Anzeige und Devil's Share scheitern.
-Die uebrigen Optionen bleiben offen.
-
-## Entscheidungskriterien
-
-Treiberqualitaet fuer E-Paper, PN532 und HX711; hostseitige Unit-Tests; OTA und
-Rollback; reproduzierbarer Build; Flash- und RAM-Bedarf.
+Treiber fuer NAU7802, PN532, E-Paper; FreeRTOS-Kontrolle (Task-Modell, ADR-0011);
+OTA mit Rollback und spaeterer Signierung; Host-Tests; ein Build fuer zwei Targets
+mit gemeinsamem Modul.

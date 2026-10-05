@@ -1,33 +1,28 @@
-# API-Vertrag, konzeptionell
+# Backend-API, konzeptionell
 
-Transport ist ausschliesslich ausgehendes HTTPS. Basis-Pfad `/vatertap/api/v1`.
-
-## Endpunkte
+Ausschliesslich ausgehendes HTTPS vom Brain. Basis `/vatertap/api/v1`.
 
 | Zweck | Methode | Pfad | Anmerkung |
 |---|---|---|---|
-| Ereignisse liefern | POST | `/events` | Batch, idempotent ueber `event_id` |
-| Roster laden | GET | `/roster` | Tag-UID zu Nutzer-ID, mit ETag |
-| Konfiguration laden | GET | `/config` | Schwellen, Timeouts, Kalibrierhinweise |
-| Tagestoken anfordern | POST | `/sessions` | liefert Token und Gueltigkeit |
-| Gesundheitsmeldung | POST | `/health` | Firmwarestand, Journalfuellstand, Fehler |
-| Persoenliche Statistik | GET | `/me` | read-only, Token-authentifiziert |
+| Events | POST | `/events` | Batch, idempotent ueber `event_id` |
+| Logs | POST | `/logs` | Warnung und Fehler, dedupliziert |
+| Health | POST | `/health` | Firmware beider Knoten, Journal, Displaystatus |
+| Roster | GET | `/roster` | Tag-UID zu Nutzer-ID, mit ETag |
+| Konfiguration | GET | `/config` | Schwellen, Timeouts, Log-Level |
+| Tagestoken | POST | `/sessions` | Token plus Gueltigkeit |
+| Statistik | GET | `/me` | read-only, Token in URL |
 
 ## Regeln
 
-- Geraeteauthentifizierung ueber geraetespezifisches Secret oder Zertifikat, getrennt
-  vom Nutzer-Token.
-- Zustellung ist at-least-once. Das Backend muss doppelte `event_id` folgenlos
-  verwerfen.
-- Ein Ereignis darf erst nach bestaetigter Uebernahme aus dem Sendepuffer entfernt
-  werden.
-- Das Backend veraendert keine Attribution.
+- Geraeteauthentifizierung getrennt vom Nutzer-Token.
+- At-least-once; doppelte `event_id` wird folgenlos verworfen.
+- Brain loescht ein Event erst nach bestaetigter Uebernahme.
+- Backend veraendert keine Attribution.
+- Sync-Reihenfolge: Events vor Logs vor Health.
 - Breaking Changes nur ueber neue Pfadversion.
 
-## Offline-Verhalten
+## Offline
 
-- Ohne Netz laeuft die Messung vollstaendig weiter.
-- Der Roster-Cache bleibt gueltig; abgelaufene Roster erzeugen eine Warnung, aber
-  keinen Betriebsstopp.
-- Kann kein Tagestoken erzeugt werden, wird gezapft und gebucht, aber kein QR
-  angezeigt. Die Statistik ist spaeter erreichbar.
+- Messung und Buchung laufen weiter.
+- Abgelaufener Roster-Cache erzeugt Warnung, keinen Stopp.
+- Ohne Tagestoken wird gebucht, aber kein QR angezeigt.

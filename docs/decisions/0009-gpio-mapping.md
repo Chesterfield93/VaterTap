@@ -4,22 +4,19 @@
 
 ## Kontext
 
-Die Belegung wird erst bei Beginn der Board-Programmierung festgelegt.
+Festlegung bei Beginn der Board-Programmierung, je Knoten.
 
-## Bekannte Vorbelastung
+| Knoten | Bedarf |
+|---|---|
+| Brain | 2x I2C (4 Pins), 1x UART (2 Pins), Reserve |
+| Display | SPI zum EE04 (vorgegeben), Taster, 1x UART |
 
-Die frueh notierte Zuordnung ist nicht uebernehmbar:
+## Bekannte Vorbelastung Display
 
-- GPIO5 war gleichzeitig als Taster und als I2C-Takt vorgesehen.
-- Die Pins der Batteriemessung werden durch Weglassen der Batterie nicht automatisch
-  elektrisch frei.
+Fruehe Notizen sahen GPIO5 doppelt vor; Batteriemesspfade werden durch Weglassen der
+Batterie nicht automatisch frei.
 
-## Vorgehen bei der Entscheidung
+## Vorgehen
 
-1. Schaltplan und Boardrevision abgleichen
-2. Durchgang und Vorbelastung am realen Board messen
-3. Boot-Strap-Pins ausschliessen
-4. Belegung mit Reserve festlegen und dokumentieren
-5. Erst danach loeten
-
-Das Ergebnis entscheidet zugleich ADR-0004.
+Schaltplan pruefen, am Board messen, Boot-Strap-Pins ausschliessen, mit Reserve
+dokumentieren, dann loeten.
